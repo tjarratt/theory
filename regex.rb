@@ -74,7 +74,7 @@ class TJRegex
   # array of operators to run on the string
   def self.parse_regex(expression)
     # valid regex can't start with * or +
-    return [] if regex_operators.include?(expression[0])
+    return [proc { false } ] if regex_operators.include?(expression[0])
 
     regex = []
     index = 0
@@ -130,7 +130,6 @@ should_pass.(".*", "")
 should_fail.('abc', 'aaa')
 should_fail.('+jkdljkd', 'aaa')
 should_fail.(".+", "")
-
 
 # from glass door
 should_pass.("a+b+c+", "abc")
