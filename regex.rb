@@ -1,110 +1,151 @@
-# string, string
-# eg: "a*b", "aaab" => true
-# eg: "a*b", "b" => true
-# eg: "a+b", "b" => false
-# regexp can contain *, + and .
-def match?(expr, string)
-  previous = nil
-  expression = expr.chars.to_a
-  escape_char = expression.shift
-  return false if escape_char == '+' #invalid regexp
+#!/usr/bin/env ruby
 
-  match_count = 0
-  # puts "matching #{string} against #{expr}"
-
-  index = 0
-  while index < string.size
-    c = string[index]
-    # puts "at char #{c} with match count #{match_count}"
-    # puts "comparing #{c} to #{escape_char}"
-
-    if c == escape_char
-      index += 1
-      match_count += 1
-      previous = escape_char
-      escape_char = expression.shift
-    elsif escape_char == '.'
-      index += 1
-      match_count += 1
-      previous = escape_char
-      escape_char = expression.shift
-    elsif escape_char == '*' # check for zero or more
-      if previous == c || previous == '.'
-        index += 1
-        match_count += 1
+class TJRegex
+  # match? -> an implemention of matching input against a regex
+  # args (string, string)
+  # eg: "a*b", "aaab" => true
+  # eg: "a*b", "b" => true
+  # eg: "a+b", "b" => false
+  # (regexp can contain *, +, . and [A-Za-z0-9])
+  def self.match?(expression, string)
+    regex = parse_regex(expression)
+    regex.each do |operator|
+      # puts operator.inspect
+      # puts string.inspect
+      unless (substring = operator.(string))
+        return false
       else
-        index += 1
-        match_count = 0
-        previous = nil
-        escape_char = expression.shift
+        string = substring
       end
-    elsif escape_char == '+' # check for one or more
-      if previous == c || previous == '.'
-        index += 1
-        match_count += 1
-        # puts "in +, incremented  match count to #{match_count}"
-      else
-        if match_count > 0
-          # puts "end of match with prev #{previous} and escape_char #{escape_char}"
-          match_count = 0
-          previous = nil
-          escape_char = expression.shift
-          # puts "now previous is nil and escape_char is #{escape_char}"
-        else
-          # puts "returning false with escape char +"
-          # puts "char: #{c}"
-          # puts "previous: #{previous}"
-          return false
+    end
+
+    return true
+  end
+
+  private
+  def self.regex_operators
+    @regex_operators ||= regex_operators = ['*', '+']
+  end
+
+  def self.checks_matching_char(substring, char)
+    # puts "comparing #{substring[0]} to #{char}"
+    if char == '.' || substring[0] == char
+      return substring[1, substring.size]
+    end
+
+    return false
+  end
+
+  def self.new_star_proc(character)
+    return proc do |str|
+      matches = true
+      substring = str.clone
+      matches_proc = new_matching_proc(character)
+
+      while matches do
+        if matches = matches_proc.(substring, character)
+          str = substring
+          substring = matches
+          # puts "substring is now #{substring}"
         end
       end
-    else
-      # puts "returning false because #{c} != #{escape_char}"
-      return false
+
+      # puts "returning #{str.inspect}"
+      str
     end
   end
 
-  if string.empty?
-    unless expr == '.*' || expr == '*'
-      return false
+  def self.new_plus_proc(character)
+    return proc do |substring|
+      matches = true
+      matches_proc = new_matching_proc(character)
+      substring = matches_proc.(substring, character)
+
+      while substring && matches
+        matches = matches_proc.(substring, character)
+        substring = matches if matches
+      end
+
+      substring
     end
   end
 
-  return true
+  # takes a given regex expression string and turns it into an
+  # array of operators to run on the string
+  def self.parse_regex(expression)
+    # valid regex can't start with * or +
+    return [] if regex_operators.include?(expression[0])
+
+    regex = []
+    index = 0
+    while index < expression.size do
+      char = expression[index]
+      next_char = expression[index + 1]
+
+      if regex_operators.include?(next_char)
+        index += 1
+
+        if next_char == '*'
+          regex << new_star_proc(char)
+        elsif next_char == '+'
+          regex << new_plus_proc(char)
+        end
+      else
+        regex << new_matching_proc(char)
+      end
+
+      index += 1
+    end
+
+    return regex
+  end
+
+  def self.new_matching_proc(char)
+    return proc {|substring| checks_matching_char(substring, char) }
+  end
 end
 
-puts "should pass:"
-# puts match?('abc', 'abc')
-# puts match?('a..', 'abc')
-# puts match?('a*', 'aaa')
-# puts match?('aa+', 'aaa')
-# puts match?('a.*', 'abc')
-# puts match?('.*g', 'abcdefg')
-# puts match?('a.*', 'abcdefg')
-# puts match?(".*", "")
+should_pass = proc do |expression, string,|
+  unless TJRegex.match?(expression, string)
+    puts "FAIL: regex (#{expression}) string #{string} (False Negative)"
+  end
+end
+
+should_fail = proc do |expr, str|
+  if TJRegex.match?(expr, str)
+    puts "FAIL: regex (#{expr}) string (#{str}) (False Positive)"
+  end
+end
+
+# of my own devising
+should_pass.('abc', 'abc')
+should_pass.('a..', 'abc')
+should_pass.('a..b', 'azzb')
+should_pass.('a*', 'aaa')
+should_pass.('aa+', 'aaa')
+should_pass.('a.*', 'abc')
+should_pass.('.*g', 'abcdefg')
+should_pass.('a.*', 'abcdefg')
+should_pass.(".*", "")
+should_fail.('abc', 'aaa')
+should_fail.('+jkdljkd', 'aaa')
+should_fail.(".+", "")
+
 
 # from glass door
-puts match?("a+b+c+", "abc")
-puts match?("a*b*c*", "abc")
-# puts match?("abc*", "abc")
-# puts match?("a..", "abc")
-# puts match?("...", "abc")
-puts match?("abcf*h", "abcffffffffffh")
-puts match?("abcf?e", "abce")
-puts match?("abcf*", "abc")
-puts match?("a*b*c*e+f+g+", "efg")
-
-
-puts "\nshould fail"
-puts match?('abc', 'aaa')
-puts match?('+jkdljkd', 'aaa')
-puts match?(".+", "")
-
-# # from glass door
-puts match?("def", "abc")
-puts match?("d+ef", "abc")
-# puts match?("d*ef", "abc")
-# puts match?("acdf+", "abc")
-# puts match?("abcf*", "abcffffffffffh")
-# puts match?("a*b*c*e+f+g+", "ef")
-
-puts "\n\nend\n\n\n"
+should_pass.("a+b+c+", "abc")
+should_pass.("a*b*c*", "abc")
+should_pass.("abc*", "abc")
+should_pass.("a..", "abc")
+should_pass.("...", "abc")
+should_pass.("abcf+h", "abcffffffffffh")
+should_pass.("abcf*h", "abcffffffffffh")
+should_pass.("abcf*h", "abch")
+should_pass.("abcf*", "abc")
+should_pass.("a*b*c*e+f+g+", "efg")
+should_fail.("def", "abc")
+should_fail.("d+ef", "abc")
+should_fail.("d*ef", "abc")
+should_fail.("acdf+", "abc")
+should_fail.("abcf*", "abcffffffffffh")
+should_fail.("a*b*c*e+f+g+", "ef")
