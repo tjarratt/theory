@@ -10,8 +10,6 @@ class TJRegex
   def self.match?(expression, string)
     regex = parse_regex(expression)
     regex.each do |operator|
-      # puts operator.inspect
-      # puts string.inspect
       unless (substring = operator.(string))
         return false
       else
@@ -28,7 +26,6 @@ class TJRegex
   end
 
   def self.checks_matching_char(substring, char)
-    # puts "comparing #{substring[0]} to #{char}"
     if char == '.' || substring[0] == char
       return substring[1, substring.size]
     end
@@ -46,11 +43,9 @@ class TJRegex
         if matches = matches_proc.(substring, character)
           str = substring
           substring = matches
-          # puts "substring is now #{substring}"
         end
       end
 
-      # puts "returning #{str.inspect}"
       str
     end
   end
