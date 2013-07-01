@@ -1,18 +1,28 @@
 class TJRegex
+  # take regex and string and try to match characters one at a time
   def self.match?(regex, string)
-    return string.empty? if regex.empty? #       if the regex is empty
+    # if the string is empty and regex is too, we have a match
+    return string.empty? if regex.empty?
     r = regex[0]
     s = string[0]
-    if regex[1] != '*'
+    if regex[1] != '*' # this is not a valid regex /**foobar**/
       raise RuntimeError if regex[0] == '*'
+      # if we have a current match (or .) AND the rest of the string matches
       return (r == s || r == '.') && match?(regex[1..regex.size], string[1..string.size])
     end
+
+    # otherwise this is a * match and we need to try matching
     index = 0
-    while r == s || (r == '.' && !s.nil?)
+    while r == s || (r == '.' && !s.nil?) # currently is a match
+      # return true, stop recursing here if the rest is a valid match
       return true if match?(regex[2..regex.size], string[index..string.size])
+
+      # otherwise we need to keep matching more characters, possibly
       index += 1
       s = string[index]
     end
+
+    # if that didn't match, assume * matches nothing
     return match?(regex[2, regex.size], string[index, string.size])
   end
 end
